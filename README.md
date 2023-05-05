@@ -1,0 +1,1 @@
+In this project, i will try to explore music store data. 
