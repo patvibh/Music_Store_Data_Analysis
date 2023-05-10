@@ -98,45 +98,32 @@ ORDER BY miliseconds DESC;
 
 /* Q9: Find how much amount spent by each customer on artists? Write a query to return customer name, artist name and total spent */
 
-WITH best_selling_artist AS (
-	SELECT artist.artist_id AS artist_id, artist.name AS artist_name, SUM(invoice_line.unit_price*invoice_line.quantity) AS total_sales
-	FROM invoice_line
-	JOIN track ON track.track_id = invoice_line.track_id
-	JOIN album ON album.album_id = track.album_id
-	JOIN artist ON artist.artist_id = album.artist_id
-	GROUP BY 1
-	ORDER BY 3 DESC
-	LIMIT 1
-)
-SELECT c.customer_id, c.first_name, c.last_name, bsa.artist_name, SUM(il.unit_price*il.quantity) AS amount_spent
-FROM invoice i
-JOIN customer c ON c.customer_id = i.customer_id
-JOIN invoice_line il ON il.invoice_id = i.invoice_id
-JOIN track t ON t.track_id = il.track_id
-JOIN album alb ON alb.album_id = t.album_id
-JOIN best_selling_artist bsa ON bsa.artist_id = alb.artist_id
-GROUP BY 1,2,3,4
-ORDER BY 5 DESC;
-
+SELECT CONCAT_WS(' ', C.first_name, C.last_name)cust_name, (A.name)artist_name, SUM(IL.unit_price * IL.quantity)total_spent
+FROM customer C
+INNER JOIN invoice I
+ON C.customer_id = I.customer_id
+INNER JOIN invoice_line IL
+ON I.invoice_id = IL.invoice_id
+INNER JOIN track T
+ON IL.track_id = T.track_id
+INNER JOIN album AL
+ON T.album_id = AL.album_id
+INNER JOIN artist A
+ON AL.artist_id = A.artist_id
+GROUP BY C.first_name, C.last_name, A.name
+ORDER BY total_spent DESC
 
 /* Q10: We want to find out the most popular music Genre for each country. We determine the most popular genre as the genre 
 with the highest amount of purchases. Write a query that returns each country along with the top Genre. For countries where 
 the maximum number of purchases is shared return all Genres. */
 
-/* Steps to Solve:  There are two parts in question- first most popular music genre and second need data at country level. */
+WITH CTE AS(
+SELECT (I.billing_country)country,CONCAT_WS(' ',C.first_name, C.last_name)cust_name , SUM(I.total)total_spendings, DENSE_RANK() OVER(PARTITION BY I.billing_country ORDER BY SUM(I.total) DESC)ran
+FROM customer C
+INNER JOIN invoice I
+ON C.customer_id = I.customer_id
+GROUP BY I.billing_country, C.first_name, C.last_name)
 
-/* Method 1: Using CTE */
-
-WITH popular_genre AS 
-(
-    SELECT COUNT(invoice_line.quantity) AS purchases, customer.country, genre.name, genre.genre_id, 
-	ROW_NUMBER() OVER(PARTITION BY customer.country ORDER BY COUNT(invoice_line.quantity) DESC) AS RowNo 
-    FROM invoice_line 
-	JOIN invoice ON invoice.invoice_id = invoice_line.invoice_id
-	JOIN customer ON customer.customer_id = invoice.customer_id
-	JOIN track ON track.track_id = invoice_line.track_id
-	JOIN genre ON genre.genre_id = track.genre_id
-	GROUP BY 2,3,4
-	ORDER BY 2 ASC, 1 DESC
-)
-SELECT * FROM popular_genre WHERE RowNo <= 1;
+SELECT country, cust_name, total_spendings
+FROM CTE
+WHERE ran = 1;
